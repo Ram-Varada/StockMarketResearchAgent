@@ -1,0 +1,9 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+env/
+venv/
+.streamlit/
+uploaded_files/
