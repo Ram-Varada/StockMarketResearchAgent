@@ -1,6 +1,6 @@
 from graph_agent import build_stock_graph
 
-from IPython.display import Image, display
+from IPython.display import Image
 
 
 if __name__ == "__main__":
@@ -9,13 +9,13 @@ if __name__ == "__main__":
     
    
     
-    image_data = graph.get_graph().draw_mermaid_png()
+    # image_data = graph.get_graph().draw_mermaid_png()
     
     user_input = input("Ask me about a stock (e.g., Apple, Tesla, etc): ")
 
     # Save to file
-    with open("stock_graph.png", "wb") as f:
-        f.write(image_data)
+    #with open("stock_graph.png", "wb") as f:
+    #    f.write(image_data)
 
     result = graph.invoke({
         "user_query": user_input,

@@ -4,8 +4,12 @@ from langchain_community.llms import HuggingFaceHub
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 import os
-from langchain_core.language_models import BaseLLM
+from langchain_core.language_models import BaseLLM, BaseLanguageModel
 from langchain.chains import LLMChain
+from typing import List, Dict, Any
+import re
+import json
+
 
 def stock_research_agent(query):
     llm = get_llm()
@@ -93,5 +97,70 @@ def extract_company_name(llm: BaseLLM, query: str) -> str:
         result = result.content
 
     return result.strip().replace('"', '')
+
+def extract_intent_and_symbols(llm: BaseLanguageModel, query: str) -> Dict[str, Any]:
+    prompt = f"""
+    You are an intelligent assistant helping categorize user queries related to stock market analysis.
+
+    Given the following query, identify:
+    1. The user's intent - one of: "stock_data", "news", "both", or "compare_stocks".
+    2. The official stock **ticker symbols** (like "AAPL", "MSFT") mentioned in the query.
+
+    Return your answer as a JSON object with:
+    - "intent": one of the valid intent values.
+    - "symbols": a list of **ticker symbols** (1 or 2 max).
+
+    Respond ONLY with the JSON block. No extra explanation.
+
+    Query: "{query}"
+    """
+
+
+    response = llm.invoke(prompt)
+    content = response.content
+
+    print('llm raw response content:', content)
+
+    # Extract JSON block inside ```json ... ```
+    json_match = re.search(r"```json\s*(\{.*?\})\s*```", content, re.DOTALL)
+    if not json_match:
+        # fallback: try to parse the whole content anyway (in case no backticks)
+        json_str = content.strip()
+    else:
+        json_str = json_match.group(1)
+
+    try:
+        result = json.loads(json_str)
+        print("[extract_intent_and_symbols] Parsed JSON:", result)
+        intent = result.get("intent", "both")
+        symbols = result.get("symbols", [])
+        return {"intent": intent, "symbols": symbols}
+    except Exception as e:
+        print("[extract_intent_and_symbols] Failed to parse JSON. Using fallback.", e)
+        return {"intent": "both", "symbols": [query.strip()]}
+
+
+def compare_stock_summaries(symbols: List[str]) -> str:
+    from stock_api import fetch_stock_data
+    if len(symbols) != 2:
+        return "Comparison requires exactly 2 symbols."
+
+    data_1 = fetch_stock_data(symbols[0])
+    data_2 = fetch_stock_data(symbols[1])
+
+    def format_data(symbol: str, data: Dict[str, Any]) -> str:
+        return f"**{symbol.upper()}**\n- Price: ${data.get('price')}\n- High: ${data.get('high')}\n- Low: ${data.get('low')}\n- Volume: {data.get('volume')}"
+
+    return f"""
+    ## 📊 Stock Comparison: {symbols[0].upper()} vs {symbols[1].upper()}
+
+    {format_data(symbols[0], data_1)}
+
+    ---
+
+    {format_data(symbols[1], data_2)}
+
+    📌 **Note:** This is a raw financial comparison. Consider reading latest news and analyst insights for better investment decisions.
+    """
     
 
