@@ -63,12 +63,17 @@ if user_query:
             symbols = [st.session_state.last_symbols[0], symbols[0]]
         elif not symbols and st.session_state.last_symbols:
             symbols = st.session_state.last_symbols
-        elif not symbols:
-            response = "❗ I couldn't identify any stock symbol. Try using names like 'Apple', 'Tesla', or tickers like 'AAPL'."
+            
+        if not symbols:
+            response = (
+                "❗ I couldn't detect any company or stock symbols in your query.\n\n"
+                "Try again using clear company names or stock tickers like `Apple`, `Tesla`, `AAPL`, `TSLA`, etc."
+            )
             with st.chat_message("assistant"):
                 st.markdown(response)
             st.session_state.chat_history.append((user_query, response))
             st.stop()
+       
 
         # 🔁 Update memory
         st.session_state.last_symbols = symbols
