@@ -1,20 +1,23 @@
 from langgraph.graph import StateGraph, END
 from typing import TypedDict, Literal, Annotated
 from langchain_core.runnables import Runnable
-from agent import generate_summary, extract_company_name, extract_intent_and_symbols,compare_stock_summaries
+from agent import  extract_intent_and_symbols
 from stock_api import fetch_stock_data, get_news
 from llm import get_llm
 from utils import analyze_sentiment,fetch_financial_ratios,fetch_analyst_ratings
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
 
 # ---------------------------
 # Define the agent's state
 # ---------------------------
 class AgentState(TypedDict):
     user_query: Annotated[str, "single"]
-    symbol: Annotated[str, "single"]
-    user_intent: Annotated[Literal["stock_data", "news", "both", "compare_stocks"], "single"]
-    stock_data: Annotated[str, "single"]
-    news_data: Annotated[str, "single"]
+    symbols: Annotated[str, "single"]
+    user_intent: Annotated[Literal["gather_stock_info",  "compare_stocks"], "single"]
+    stock_info: Annotated[str, "single"]
+    news_info: Annotated[str, "single"]
     summary: Annotated[str, "single"]
     compare_symbols: Annotated[list[str], "single"]
     comparison_result: Annotated[str, "single"]
@@ -27,47 +30,110 @@ def analyze_user_query_node(state: AgentState) -> AgentState:
     llm = get_llm()
 
     result = extract_intent_and_symbols(llm, query)
-    print('result',result)
+    
     intent = result["intent"]
     symbols = result["symbols"]
 
-    print(f"[Analyze] Intent: {intent}, Symbols: {symbols}")
+    
 
     if intent == "compare_stocks":
         return {**state, "user_intent": intent, "compare_symbols": symbols}
     else:
-        return {**state, "user_intent": intent, "symbol": symbols[0]}
+        return {**state, "user_intent": intent, "symbols": symbols[0]}
 
-# ---------------------------
-# Node: Fetch stock data
-# ---------------------------
-def fetch_data_node(state: AgentState) -> AgentState:
-    symbol = state.get("symbol")
-    data = fetch_stock_data(symbol)
-    print(f"[Fetch Data] Fetched for {symbol}: {str(data)[:100]}...")
-    return {**state, "stock_data": data}
+   
 
 # ---------------------------
 # Node: Fetch news
 # ---------------------------
 def fetch_news_node(state: AgentState) -> AgentState:
-    symbol = state.get("symbol")
+    
+    symbol = state.get("symbols", [])
     news = get_news(symbol)
-    print(f"[Fetch News] Fetched for {symbol}: {len(news)} articles")
+   
     return {**state, "news_data": news}
+
+
+def  gather_stock_info_node(state: AgentState) -> AgentState:
+   
+    symbol = state.get("symbols", [])
+      
+    
+    
+    stock_data = fetch_stock_data(symbol)
+    financial_ratios = fetch_financial_ratios(symbol)
+ 
+    news_info = (fetch_news_node(state))
+
+    combined_data = {
+        "Current Price": stock_data.get("price", "N/A"),
+        "52-Week Range": f"{stock_data.get('low', 'N/A')} - {stock_data.get('high', 'N/A')}",
+        "Volume": stock_data.get("volume", "N/A"),
+        "P/E Ratio": financial_ratios.get("PE Ratio", "N/A"),
+        "ROE": financial_ratios.get("ROE", "N/A"),
+        "ROA": financial_ratios.get("ROA", "N/A"),
+        "Current Ratio": financial_ratios.get("Current Ratio", "N/A"),
+        "Debt-to-Equity": financial_ratios.get("Debt/Equity", "N/A")
+    }
+
+    
+
+    return {
+        **state,
+        "stock_info": {symbol: combined_data},
+        "news_info": {symbol: news_info}
+    }
 
 # ---------------------------
 # Node: Summarize
 # ---------------------------
-def summarize_node(state: AgentState) -> AgentState:
-    print(f"[Summarize] Intent: {state['user_intent']}")
-    news = state.get("news_data", []) if state["user_intent"] != "stock_data" else []
-    stock_data = state.get("stock_data", "")
-    summary = generate_summary(stock_data, news)
-    print("===== Summary =====\n")
-    print(summary)
-    return {**state, "summary": summary}
+def summarize_node(state: AgentState) -> AgentState:  
 
+   
+
+    symbol = state["symbols"]  # already a string
+    stock_info = state["stock_info"][symbol]
+    news_info = state["news_info"][symbol] 
+    
+    
+    prompt_template = PromptTemplate.from_template("""
+    You are a financial analyst. Based on the stock data and news provided, write a detailed investment summary.
+
+    Include:
+    - Current price, range, volume
+    - Sentiment summary from recent news
+    - A markdown table with metrics like P/E ratio, market cap, etc.
+    - A final investment recommendation
+    - A disclaimer
+
+    Use markdown with headings and emojis.
+
+    Stock Info:
+    {stock_info}
+
+    News:
+    {news_info}
+    """)
+    
+    llm = get_llm()
+
+    summary_chain = (
+        prompt_template
+        | llm
+        | StrOutputParser()
+    )
+
+    summary = summary_chain.invoke({
+        "stock_info": stock_info,
+        "news_info": news_info
+    })  
+    
+
+
+    return {**state, "summary": summary}
+    
+
+    
 # ---------------------------
 # Node: Compare Stocks
 # ---------------------------
@@ -77,7 +143,7 @@ def summarize_node(state: AgentState) -> AgentState:
 def compare_stocks_node(state: AgentState) -> AgentState:
     llm = get_llm()
     symbols = state.get("compare_symbols", [])
-    print("symbols", symbols)
+   
 
     if len(symbols) < 2:
         return {**state, "summary": "Please provide two stock symbols to compare."}
@@ -156,12 +222,14 @@ def analyze_router(state: AgentState) -> str:
 # ---------------------------
 # Build the LangGraph
 # ---------------------------
+
+
+
 def build_stock_graph() -> Runnable:
     builder = StateGraph(AgentState)
 
     builder.add_node("analyze_query", analyze_user_query_node)
-    builder.add_node("fetch_data", fetch_data_node)
-    builder.add_node("fetch_news", fetch_news_node)
+    builder.add_node("gather_stock_info", gather_stock_info_node)  # 🔁 NEW NODE
     builder.add_node("summarize", summarize_node)
     builder.add_node("compare_stocks", compare_stocks_node)
 
@@ -171,24 +239,15 @@ def build_stock_graph() -> Runnable:
         "analyze_query",
         analyze_router,
         {
-            "stock_data": "fetch_data",
-            "news": "fetch_news",
-            "both": "fetch_data",
+            "gather_stock_info": "gather_stock_info",           
             "compare_stocks": "compare_stocks"
         }
     )
 
-    builder.add_conditional_edges(
-        "fetch_data",
-        lambda state: state["user_intent"],
-        {
-            "stock_data": "summarize",
-            "both": "fetch_news"
-        }
-    )
-
-    builder.add_edge("fetch_news", "summarize")
+    builder.add_edge("gather_stock_info", "summarize")
     builder.add_edge("summarize", END)
     builder.add_edge("compare_stocks", END)
 
     return builder.compile()
+
+
