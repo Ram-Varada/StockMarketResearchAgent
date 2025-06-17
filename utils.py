@@ -36,7 +36,7 @@ def fetch_financial_ratios(symbol: str) -> dict:
         response = requests.get(url)
         response.raise_for_status()
         data = response.json()
-        print(data)
+       
        
 
         if not data:

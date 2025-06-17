@@ -7,6 +7,9 @@ from llm import get_llm
 from utils import analyze_sentiment,fetch_financial_ratios,fetch_analyst_ratings
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from datetime import datetime
+today = datetime.now().strftime("%B %d, %Y")
+
 
 
 # ---------------------------
@@ -150,9 +153,7 @@ def compare_stocks_node(state: AgentState) -> AgentState:
 
     symbol_a, symbol_b = symbols[0], symbols[1]
 
-    # Fetch data for both stocks
-    stock_data_a = fetch_stock_data(symbol_a)
-    stock_data_b = fetch_stock_data(symbol_b)
+   
 
     news_a = get_news(symbol_a)
     news_b = get_news(symbol_b)
@@ -163,12 +164,13 @@ def compare_stocks_node(state: AgentState) -> AgentState:
 
     ratios_a = fetch_financial_ratios(symbol_a) if callable(globals().get("fetch_financial_ratios")) else {}
     ratios_b = fetch_financial_ratios(symbol_b) if callable(globals().get("fetch_financial_ratios")) else {}
+    
 
     analyst_ratings_a = fetch_analyst_ratings(symbol_a) if callable(globals().get("fetch_analyst_ratings")) else "Not Available"
     analyst_ratings_b = fetch_analyst_ratings(symbol_b) if callable(globals().get("fetch_analyst_ratings")) else "Not Available"
 
     # Format Financial Ratio Table
-    financial_metrics = ["P/E Ratio", "Dividend Yield", "Market Cap", "Revenue Growth YoY", "Net Margin"]
+    financial_metrics = ["PE Ratio", "ROE", "ROA", "Debt/Equity", "Current Ratio"]
     ratio_table = "| Metric | " + symbol_a + " | " + symbol_b + " |\n|--------|" + "--------|"*2 + "\n"
     for metric in financial_metrics:
         val_a = ratios_a.get(metric)
@@ -177,12 +179,13 @@ def compare_stocks_node(state: AgentState) -> AgentState:
 
     # Create structured LLM prompt
     prompt = f"""
-    You are a stock market analyst comparing two companies based on their metrics, news, and financial sentiment.
+    You are a professional stock market analyst comparing two companies using live financial data from FinancialModelingPrep and recent news headlines. Today's date is {today}.
 
     Compare {symbol_a} and {symbol_b} across these sections:
 
     1. 📊 **Financial Overview Table**  
-    {ratio_table}
+    {ratio_table}  
+    Source: FinancialModelingPrep (as of {today})
 
     2. 📌 **Company Strengths & Weaknesses**  
     Use your knowledge and recent news headlines to list 2-3 strengths and weaknesses for each company.
@@ -191,8 +194,8 @@ def compare_stocks_node(state: AgentState) -> AgentState:
     Summarize key business or market movements, earnings news, product launches, and growth plans.
 
     4. 📉 **News Sentiment Score (Past 7 Days)**  
-    Apple: {sentiment_a}  
-    Microsoft: {sentiment_b}
+    {symbol_a}: {sentiment_a}  
+    {symbol_b}: {sentiment_b}
 
     5. 🧠 **Analyst Rating Summary**  
     {symbol_a}: {analyst_ratings_a}  
@@ -205,6 +208,7 @@ def compare_stocks_node(state: AgentState) -> AgentState:
     7. ✅ **Final Verdict**  
     Conclude with a recommendation: Which stock may be better and why, based on risk/reward.
     """.strip()
+
 
     analysis_summary = llm.invoke(prompt).content.strip()
 
