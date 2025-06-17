@@ -23,6 +23,7 @@ class AgentState(TypedDict):
     news_info: Annotated[str, "single"]
     summary: Annotated[str, "single"]
     compare_symbols: Annotated[list[str], "single"]
+    last_symbols: Annotated[list[str], "single"]
     comparison_result: Annotated[str, "single"]
 
 # ---------------------------
@@ -144,9 +145,17 @@ def summarize_node(state: AgentState) -> AgentState:
 
 
 def compare_stocks_node(state: AgentState) -> AgentState:
-    llm = get_llm()
+    llm = get_llm()   
+    
     symbols = state.get("compare_symbols", [])
-   
+
+    # Handle follow-up comparison like "Compare with Tesla"
+    if len(symbols) == 1:
+        last_symbols = state.get("last_symbols", [])
+        if last_symbols:
+            symbols = [last_symbols[0], symbols[0]]
+        else:
+            return {**state, "summary": "Please provide two stock symbols to compare."}
 
     if len(symbols) < 2:
         return {**state, "summary": "Please provide two stock symbols to compare."}
