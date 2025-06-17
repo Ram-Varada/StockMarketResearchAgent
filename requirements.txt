@@ -11,3 +11,4 @@ langchain-groq
 streamlit
 langchain-community
 transformers
+torch
