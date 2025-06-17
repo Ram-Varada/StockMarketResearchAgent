@@ -4,6 +4,7 @@ from langchain_core.runnables import Runnable
 from agent import generate_summary, extract_company_name, extract_intent_and_symbols,compare_stock_summaries
 from stock_api import fetch_stock_data, get_news
 from llm import get_llm
+from utils import analyze_sentiment,fetch_financial_ratios,fetch_analyst_ratings
 
 # ---------------------------
 # Define the agent's state
@@ -76,45 +77,74 @@ def summarize_node(state: AgentState) -> AgentState:
 def compare_stocks_node(state: AgentState) -> AgentState:
     llm = get_llm()
     symbols = state.get("compare_symbols", [])
-    print('symbols', symbols)
+    print("symbols", symbols)
+
     if len(symbols) < 2:
-        # fallback if only one or no symbols recognized
         return {**state, "summary": "Please provide two stock symbols to compare."}
 
-    # Fetch raw data for both stocks
-    stock_a_data = fetch_stock_data(symbols[0])
-    stock_b_data = fetch_stock_data(symbols[1])
+    symbol_a, symbol_b = symbols[0], symbols[1]
 
-    # Optional: fetch news summaries for context
-    news_a = get_news(symbols[0])
-    news_b = get_news(symbols[1])
+    # Fetch data for both stocks
+    stock_data_a = fetch_stock_data(symbol_a)
+    stock_data_b = fetch_stock_data(symbol_b)
 
-    # Prepare a prompt for LLM to generate a meaningful comparison
+    news_a = get_news(symbol_a)
+    news_b = get_news(symbol_b)
+
+    # Optional: Sentiment, Ratios, Analyst Ratings
+    sentiment_a = analyze_sentiment(news_a) if callable(globals().get("analyze_sentiment")) else "Neutral"
+    sentiment_b = analyze_sentiment(news_b) if callable(globals().get("analyze_sentiment")) else "Neutral"
+
+    ratios_a = fetch_financial_ratios(symbol_a) if callable(globals().get("fetch_financial_ratios")) else {}
+    ratios_b = fetch_financial_ratios(symbol_b) if callable(globals().get("fetch_financial_ratios")) else {}
+
+    analyst_ratings_a = fetch_analyst_ratings(symbol_a) if callable(globals().get("fetch_analyst_ratings")) else "Not Available"
+    analyst_ratings_b = fetch_analyst_ratings(symbol_b) if callable(globals().get("fetch_analyst_ratings")) else "Not Available"
+
+    # Format Financial Ratio Table
+    financial_metrics = ["P/E Ratio", "Dividend Yield", "Market Cap", "Revenue Growth YoY", "Net Margin"]
+    ratio_table = "| Metric | " + symbol_a + " | " + symbol_b + " |\n|--------|" + "--------|"*2 + "\n"
+    for metric in financial_metrics:
+        val_a = ratios_a.get(metric, "N/A")
+        val_b = ratios_b.get(metric, "N/A")
+        ratio_table += f"| {metric} | {val_a} | {val_b} |\n"
+
+    # Create structured LLM prompt
     prompt = f"""
-    You are a financial analyst. Compare these two stocks based on the data and recent news headlines.
+    You are a stock market analyst comparing two companies based on their metrics, news, and financial sentiment.
 
-    Stock A ({symbols[0]}):
-    {stock_a_data}
+    Compare {symbol_a} and {symbol_b} across these sections:
 
-    Recent news headlines:
-    {news_a[:5]}
+    1. 📊 **Financial Overview Table**  
+    {ratio_table}
 
-    Stock B ({symbols[1]}):
-    {stock_b_data}
+    2. 📌 **Company Strengths & Weaknesses**  
+    Use your knowledge and recent news headlines to list 2-3 strengths and weaknesses for each company.
 
-    Recent news headlines:
-    {news_b[:5]}
+    3. 🔍 **Recent Trends & Outlook**  
+    Summarize key business or market movements, earnings news, product launches, and growth plans.
 
-    Provide a detailed comparative analysis highlighting strengths, weaknesses, recent trends, volatility, and overall outlook. Conclude with which stock might be a better investment and why.
-    """
+    4. 📉 **News Sentiment Score (Past 7 Days)**  
+    Apple: {sentiment_a}  
+    Microsoft: {sentiment_b}
 
-    # Ask LLM for the analysis summary
+    5. 🧠 **Analyst Rating Summary**  
+    {symbol_a}: {analyst_ratings_a}  
+    {symbol_b}: {analyst_ratings_b}
+
+    6. 👥 **Who Should Invest in Each?**  
+    For {symbol_a}: Describe ideal investor profiles.  
+    For {symbol_b}: Same.
+
+    7. ✅ **Final Verdict**  
+    Conclude with a recommendation: Which stock may be better and why, based on risk/reward.
+    """.strip()
+
     analysis_summary = llm.invoke(prompt).content.strip()
 
-    # Format final summary with heading
-    final_summary = f"## 📊 Stock Comparison: {symbols[0]} vs {symbols[1]}\n\n{analysis_summary}"
+    formatted_output = f"## 📊 Stock Comparison: {symbol_a} vs {symbol_b}\n\n{analysis_summary}"
 
-    return {**state, "summary": final_summary}
+    return {**state, "summary": formatted_output}
 
 
 # ---------------------------
