@@ -5,3 +5,7 @@ requests
 python-dotenv
 fastapi
 uvicorn
+langchain-huggingface
+langchain-core
+langchain-groq
+streamlit
