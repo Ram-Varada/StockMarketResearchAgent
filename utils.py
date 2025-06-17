@@ -15,39 +15,18 @@ FMP_BASE_URL = "https://financialmodelingprep.com/api/v3"
 # Load once globally (or in startup if using FastAPI)
 sentiment_pipeline = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
 
-def analyze_sentiment(news_headlines: list[str]) -> str:
-    if not news_headlines:
-        return "Neutral"
+def analyze_sentiment(articles):
+    if not articles:
+        return "No news available"
 
-    # Sanitize input: remove None, empty strings, or non-str values
-    clean_headlines = [str(h).strip() for h in news_headlines if isinstance(h, str) and h.strip()]
-    
-    if not clean_headlines:
-        return "Neutral"
+    sentiments = [sentiment_pipeline(article["title"])[0]["label"] for article in articles]
 
-    try:
-        results = sentiment_pipeline(clean_headlines)
-        scores = {"POSITIVE": 0, "NEGATIVE": 0, "NEUTRAL": 0}
-
-        for res in results:
-            label = res["label"]
-            if label in scores:
-                scores[label] += 1
-            else:
-                scores["NEUTRAL"] += 1  # fallback
-
-        if scores["POSITIVE"] > scores["NEGATIVE"]:
-            return "Positive"
-        elif scores["NEGATIVE"] > scores["POSITIVE"]:
-            return "Negative"
-        return "Neutral"
-    except Exception as e:
-        print(f"[analyze_sentiment] Error analyzing sentiment: {e}")
-        return "Neutral"
-
-
-
-
+    if sentiments.count("POSITIVE") > sentiments.count("NEGATIVE"):
+        return "Positive"
+    elif sentiments.count("NEGATIVE") > sentiments.count("POSITIVE"):
+        return "Negative"
+    else:
+        return "Mixed"
 
 
 

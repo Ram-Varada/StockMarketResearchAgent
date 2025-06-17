@@ -66,14 +66,14 @@ def  gather_stock_info_node(state: AgentState) -> AgentState:
     news_info = (fetch_news_node(state))
 
     combined_data = {
-        "Current Price": stock_data.get("price", "N/A"),
-        "52-Week Range": f"{stock_data.get('low', 'N/A')} - {stock_data.get('high', 'N/A')}",
-        "Volume": stock_data.get("volume", "N/A"),
-        "P/E Ratio": financial_ratios.get("PE Ratio", "N/A"),
-        "ROE": financial_ratios.get("ROE", "N/A"),
-        "ROA": financial_ratios.get("ROA", "N/A"),
-        "Current Ratio": financial_ratios.get("Current Ratio", "N/A"),
-        "Debt-to-Equity": financial_ratios.get("Debt/Equity", "N/A")
+        "Current Price": stock_data.get("price"),
+        "52-Week Range": f"{stock_data.get('low')} - {stock_data.get('high')}",
+        "Volume": stock_data.get("volume"),
+        "P/E Ratio": financial_ratios.get("PE Ratio"),
+        "ROE": financial_ratios.get("ROE"),
+        "ROA": financial_ratios.get("ROA"),
+        "Current Ratio": financial_ratios.get("Current Ratio"),
+        "Debt-to-Equity": financial_ratios.get("Debt/Equity")
     }
 
     
@@ -102,7 +102,7 @@ def summarize_node(state: AgentState) -> AgentState:
     Include:
     - Current price, range, volume
     - Sentiment summary from recent news
-    - A markdown table with metrics like P/E ratio, market cap, etc.
+    - A markdown table with metrics like P/E ratio etc.
     - A final investment recommendation
     - A disclaimer
 
@@ -171,8 +171,8 @@ def compare_stocks_node(state: AgentState) -> AgentState:
     financial_metrics = ["P/E Ratio", "Dividend Yield", "Market Cap", "Revenue Growth YoY", "Net Margin"]
     ratio_table = "| Metric | " + symbol_a + " | " + symbol_b + " |\n|--------|" + "--------|"*2 + "\n"
     for metric in financial_metrics:
-        val_a = ratios_a.get(metric, "N/A")
-        val_b = ratios_b.get(metric, "N/A")
+        val_a = ratios_a.get(metric)
+        val_b = ratios_b.get(metric)
         ratio_table += f"| {metric} | {val_a} | {val_b} |\n"
 
     # Create structured LLM prompt
