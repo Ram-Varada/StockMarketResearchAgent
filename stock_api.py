@@ -1,18 +1,21 @@
 import requests
 import os
 from dotenv import load_dotenv
+import streamlit as st
 
 load_dotenv()
 
-STOCK_API_KEY = os.getenv("STOCK_API_KEY")
+""" STOCK_API_KEY = os.getenv("STOCK_API_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
-FMP_API_KEY = os.getenv("FMP_API_KEY")
+FMP_API_KEY = os.getenv("FMP_API_KEY") """
+
+STOCK_API_KEY = st.secrets.get("STOCK_API_KEY", os.getenv("STOCK_API_KEY"))
+NEWS_API_KEY = st.secrets.get("NEWS_API_KEY", os.getenv("NEWS_API_KEY")) 
+FMP_API_KEY =  st.secrets.get("FMP_API_KEY", os.getenv("FMP_API_KEY"))  
 
 import requests
 
-def fetch_stock_data(symbol: str) -> dict:
-   
-    
+def fetch_stock_data(symbol: str) -> dict:    
     
     try:
         url = f"https://financialmodelingprep.com/api/v3/quote/{symbol}?apikey={FMP_API_KEY}"

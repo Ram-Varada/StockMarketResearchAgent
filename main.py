@@ -11,7 +11,7 @@ if __name__ == "__main__":
     
     # image_data = graph.get_graph().draw_mermaid_png()
     
-    user_input = input("Ask me about a stock (e.g., Apple, Tesla, etc): ")
+    user_input = input("Ask me about any public company or compare two (e.g., `Compare Apple and Microsoft`)")
 
     # Save to file
     #with open("stock_graph.png", "wb") as f:

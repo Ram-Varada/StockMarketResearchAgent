@@ -3,9 +3,14 @@ import requests
 import os
 
 from dotenv import load_dotenv
+import streamlit as st
 
 
 load_dotenv()
+
+# FMP_API_KEY = os.getenv("FMP_API_KEY")
+FMP_API_KEY =  st.secrets.get("FMP_API_KEY", os.getenv("FMP_API_KEY")) 
+FMP_BASE_URL = "https://financialmodelingprep.com/api/v3"
 
 # Load once globally (or in startup if using FastAPI)
 sentiment_pipeline = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
@@ -44,8 +49,7 @@ def analyze_sentiment(news_headlines: list[str]) -> str:
 
 
 
-FMP_API_KEY = os.getenv("FMP_API_KEY")
-FMP_BASE_URL = "https://financialmodelingprep.com/api/v3"
+
 
 def fetch_financial_ratios(symbol: str) -> dict:
     try:
@@ -53,6 +57,7 @@ def fetch_financial_ratios(symbol: str) -> dict:
         response = requests.get(url)
         response.raise_for_status()
         data = response.json()
+        print(data)
        
 
         if not data:
